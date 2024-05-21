@@ -1,5 +1,6 @@
 from enum import Enum
 
+QUEUE = 'FIFO'
 
 class Status(Enum):
     created = 0
@@ -71,8 +72,6 @@ class Task():
         if self.time_to_exec is None:
             self.time_to_exec = resources.t + self.input_time
         if self.time_to_exec == resources.t:
-            # if self.id == 10:
-                # print('hello========================================================')
             self.status = Status.inputed
             resources.add_task()
             self.execute(resources)
@@ -87,8 +86,6 @@ class Task():
             print(f'Задание {self.id} постуило.', end=' ')
             if self.required_ram > resources.ram or self.required_hdd > resources.hdd:
                 queue.add(self)
-                # queue.print()
-                # print('длина', len(queue.waiting_list)) #------------
                 self.status = Status.in_queue
                 return Status.in_queue
             resources.seize(self.required_ram, self.required_hdd)
@@ -122,10 +119,25 @@ def draw_by_fifo(waiting_list: {}, resources: Resources):
         task = tasks_to_draw.get(min(tasks_to_draw))
         resources.seize(task.required_ram, task.required_hdd)
         task.status = Status.released
-        # print('до', len(waiting_list)) #----------
         waiting_list.pop(min(tasks_to_draw))
-        # print('после', len(waiting_list)) #------------
         draw_by_fifo(waiting_list, resources)
+
+
+def draw_by_sjf(waiting_list: {}, resources: Resources):
+    tasks_to_draw = {}
+
+    for task_id, task in waiting_list.items():
+        if task.required_ram <= resources.ram and task.required_hdd <= resources.hdd:
+            tasks_to_draw[task_id] = task
+
+    if len(tasks_to_draw) > 0:
+        task = min(tasks_to_draw.values(), key=lambda unit: unit.execution_time)
+        resources.seize(task.required_ram, task.required_hdd)
+        task.status = Status.released
+        for key, value in dict(waiting_list).items():
+            if value is task:
+                waiting_list.pop(key)
+        draw_by_sjf(waiting_list, resources)
 
 def print_task_info(ret, task: Task):
     ended = 0
@@ -133,11 +145,7 @@ def print_task_info(ret, task: Task):
         print(f'Задание {task.id} назначается на ввод.')
     elif ret is Status.in_queue:
         print(f'Задание {task.id} помещается в очередь из-за нехватки ресурсов.')
-    # elif ret is Status.released:
-    #     print(f'Задание {task.id} выходит из очереди и назначается на ввод.')
     elif ret is Status.inputed:
-        # if task.input_time == 0:
-        #     print(f'Задание {task.id} постуило.', end=' ')
         print(f'Задание {task.id} назначается на выполнение.')
     elif ret is Status.ended:
         print(f'Задание {task.id} выполнено.')
@@ -146,7 +154,6 @@ def print_task_info(ret, task: Task):
 
 def main():
     ended = 0
-
     resources = Resources()
     task_1 = Task(1, 3,	2,	4,	10,	60)
     task_2 = Task(2, 5,	0,	9,	0,	30)
@@ -162,7 +169,8 @@ def main():
 
     tasks = [task_1, task_2, task_3, task_4, task_5,
              task_6, task_7, task_8, task_9, task_10]
-
+    print(f'Тип очереди: {QUEUE}')
+    print('------------------------------')
     while ended < 10:
         print_data = False
         for task in tasks:
@@ -172,7 +180,11 @@ def main():
             ended += print_task_info(ret, task)
 
         if len(queue.waiting_list) > 0:
-            draw_by_fifo(queue.waiting_list, resources)
+            if QUEUE == 'FIFO':
+                draw_by_fifo(queue.waiting_list, resources)
+            else:
+                draw_by_sjf(queue.waiting_list, resources)
+
 
             for task in tasks:
                 ret = task.search_for_released(resources)
@@ -182,19 +194,10 @@ def main():
 
         if print_data is True:
             resources.print()
-            # print(f'Выполнено: {ended}, очередь: {queue.print()}')
-            # print('101010', task_10.time_to_exec)
-            # print('101010', task_10.time_to_end)
-            # print('101010', task_10.status)
             print('------------------------------')
 
         resources.clock()
         print_data = False
-        # if resources.t == 269:
-        #     print('NOW')
-
-    # a = Status.created
-    # print(f'{a is Status.created}')
 
 
 if __name__ == "__main__":
